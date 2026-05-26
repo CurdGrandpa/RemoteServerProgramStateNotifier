@@ -21,21 +21,31 @@ def read_maxbot_working():
         pkey=paramiko.Ed25519Key.from_private_key_file(private_key_file, pk_passphrase),
         passphrase=pk_passphrase
     )
-    stdin, stdout, stderr = client.exec_command("""ps aux | grep 'node bot.js'""")# | awk '{print $1,":\\n",$3,"-",$4,"-",$5}'
+    stdin, stdout, stderr = client.exec_command("""ps aux | grep 'node bot.js'""")
     data = stdout.read() + stderr.read()
+
+    line = next(iter(
+        i
+        for i in data.decode('utf-8').split('\n')
+        if (i.rfind("node bot.js") == len(i) - len("node bot.js") and i.find("grep") == -1)
+    ), None)
+    res1 = line is not None
+
+
+    stdin, stdout, stderr = client.exec_command("""systemctl is-active maxbot.service""")
+    data = stdout.read() + stderr.read()
+
+    res2 = data.decode('utf-8') == "active"
+
     client.close()
-    return data
+    return res1 or res2
 
 
 def notify_maxbot_is_working():
-    msg = read_maxbot_working().decode('utf-8')
-    line = next(iter(
-        i
-        for i in msg.split('\n')
-        if (i.rfind("node bot.js") == len(i) - len("node bot.js") and i.find("grep") == -1)
-    ), None)
+    is_active = read_maxbot_working()
+
     notification.notify(
         title='Бот цифровой заведующий',
-        message="Бот работает, всё хорошо" if line is not None else "Иди восстанавливать! Срочно!",
+        message="Бот работает, всё хорошо" if is_active else "Иди восстанавливать! Срочно!",
         timeout=60,  # Время показа (сек),
     )
